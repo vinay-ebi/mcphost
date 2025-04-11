@@ -17,8 +17,8 @@ This architecture allows language models to:
 Currently supports:
 - Claude 3.5 Sonnet (claude-3-5-sonnet-20240620)
 - Any Ollama-compatible model with function calling support
+- Google Gemini models
 - Any OpenAI-compatible local or online model with function calling support
-
 
 ## Features ✨
 
@@ -35,6 +35,7 @@ Currently supports:
 - Go 1.23 or later
 - For Claude: An Anthropic API key
 - For Ollama: Local Ollama installation with desired models
+- For Google/Gemini: Google API key (see https://aistudio.google.com/app/apikey)
 - One or more MCP-compatible tool servers
 
 ## Environment Setup 🔧
@@ -55,9 +56,13 @@ ollama pull mistral
 ollama serve
 ```
 
-3. OpenAI compatible online Setup
-- Get your api server base url, api key and model name
+3. Google API Key (for Gemini):
+```bash
+export GOOGLE_API_KEY='your-api-key'
+```
 
+4. OpenAI compatible online Setup
+- Get your api server base url, api key and model name
 
 ## Installation 📦
 
@@ -107,6 +112,7 @@ Models can be specified using the `--model` (`-m`) flag:
 - Anthropic Claude (default): `anthropic:claude-3-5-sonnet-latest`
 - OpenAI or OpenAI-compatible: `openai:gpt-4`
 - Ollama models: `ollama:modelname`
+- Google: `google:gemini-2.0-flash`
 
 ### Examples
 ```bash
@@ -131,6 +137,7 @@ mcphost --model openai:<your-model-name> \
 - `-m, --model string`: Model to use (format: provider:model) (default "anthropic:claude-3-5-sonnet-latest")
 - `--openai-url string`: Base URL for OpenAI API (defaults to api.openai.com)
 - `--openai-api-key string`: OpenAI API key (can also be set via OPENAI_API_KEY environment variable)
+- `--google-api-key string`: Google API key (can also be set via GOOGLE_API_KEY environment variable)
 
 
 ### Interactive Commands
