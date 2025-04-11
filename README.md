@@ -56,6 +56,8 @@ ollama pull mistral
 ollama serve
 ```
 
+You can also configure the Ollama client using standard environment variables, such as `OLLAMA HOST` for the Ollama base URL.
+
 3. Google API Key (for Gemini):
 ```bash
 export GOOGLE_API_KEY='your-api-key'
