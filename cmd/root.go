@@ -238,7 +238,7 @@ func updateRenderer() error {
 func runPrompt(
 	ctx context.Context,
 	provider llm.Provider,
-	mcpClients map[string]*mcpclient.StdioMCPClient,
+	mcpClients map[string]mcpclient.MCPClient,
 	tools []llm.Tool,
 	prompt string,
 	messages *[]history.HistoryMessage,
