@@ -2,6 +2,8 @@
 
 A CLI host application that enables Large Language Models (LLMs) to interact with external tools through the Model Context Protocol (MCP). Currently supports both Claude 3.5 Sonnet and Ollama models.
 
+Discuss the Project on [Discord](https://discord.gg/RqSS2NQVsY)
+
 ## Overview 🌟
 
 MCPHost acts as a host in the MCP client-server architecture, where:
