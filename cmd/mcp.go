@@ -21,6 +21,11 @@ import (
 	"github.com/mark3labs/mcphost/pkg/llm"
 )
 
+const (
+	transportStdio = "stdio"
+	transportSSE   = "sse"
+)
+
 var (
 	// Tokyo Night theme colors
 	tokyoPurple = lipgloss.Color("99")  // #9d7cd8
@@ -60,13 +65,64 @@ var (
 )
 
 type MCPConfig struct {
-	MCPServers map[string]ServerConfig `json:"mcpServers"`
+	MCPServers map[string]ServerConfigWrapper `json:"mcpServers"`
 }
 
-type ServerConfig struct {
+type ServerConfig interface {
+	GetType() string
+}
+
+type STDIOServerConfig struct {
 	Command string            `json:"command"`
 	Args    []string          `json:"args"`
 	Env     map[string]string `json:"env,omitempty"`
+}
+
+func (s STDIOServerConfig) GetType() string {
+	return transportStdio
+}
+
+type SSEServerConfig struct {
+	Url     string   `json:"url"`
+	Headers []string `json:"headers,omitempty"`
+}
+
+func (s SSEServerConfig) GetType() string {
+	return transportSSE
+}
+
+type ServerConfigWrapper struct {
+	Config ServerConfig
+}
+
+func (w *ServerConfigWrapper) UnmarshalJSON(data []byte) error {
+	var typeField struct {
+		Url string `json:"url"`
+	}
+
+	if err := json.Unmarshal(data, &typeField); err != nil {
+		return err
+	}
+	if typeField.Url != "" {
+		// If the URL field is present, treat it as an SSE server
+		var sse SSEServerConfig
+		if err := json.Unmarshal(data, &sse); err != nil {
+			return err
+		}
+		w.Config = sse
+	} else {
+		// Otherwise, treat it as a STDIOServerConfig
+		var stdio STDIOServerConfig
+		if err := json.Unmarshal(data, &stdio); err != nil {
+			return err
+		}
+		w.Config = stdio
+	}
+
+	return nil
+}
+func (w ServerConfigWrapper) MarshalJSON() ([]byte, error) {
+	return json.Marshal(w.Config)
 }
 
 func mcpToolsToAnthropicTools(
@@ -108,7 +164,7 @@ func loadMCPConfig() (*MCPConfig, error) {
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		// Create default config
 		defaultConfig := MCPConfig{
-			MCPServers: make(map[string]ServerConfig),
+			MCPServers: make(map[string]ServerConfigWrapper),
 		}
 
 		// Create the file with default config
@@ -149,31 +205,45 @@ func createMCPClients(
 	clients := make(map[string]mcpclient.MCPClient)
 
 	for name, server := range config.MCPServers {
-		var env []string
-		for k, v := range server.Env {
-			env = append(env, fmt.Sprintf("%s=%s", k, v))
-		}
 		var client mcpclient.MCPClient
 		var err error
 
-		if server.Command == "sse_server" {
-			if len(server.Args) == 0 {
-				return nil, fmt.Errorf(
-					"no arguments provided for sse command",
-				)
+		if server.Config.GetType() == transportSSE {
+			sseConfig := server.Config.(SSEServerConfig)
+
+			options := []mcpclient.ClientOption{}
+
+			if sseConfig.Headers != nil {
+				// Parse headers from the config
+				headers := make(map[string]string)
+				for _, header := range sseConfig.Headers {
+					parts := strings.SplitN(header, ":", 2)
+					if len(parts) == 2 {
+						key := strings.TrimSpace(parts[0])
+						value := strings.TrimSpace(parts[1])
+						headers[key] = value
+					}
+				}
+				options = append(options, mcpclient.WithHeaders(headers))
 			}
 
 			client, err = mcpclient.NewSSEMCPClient(
-				server.Args[0],
+				sseConfig.Url,
+				options...,
 			)
 			if err == nil {
 				err = client.(*mcpclient.SSEMCPClient).Start(context.Background())
 			}
 		} else {
+			stdioConfig := server.Config.(STDIOServerConfig)
+			var env []string
+			for k, v := range stdioConfig.Env {
+				env = append(env, fmt.Sprintf("%s=%s", k, v))
+			}
 			client, err = mcpclient.NewStdioMCPClient(
-				server.Command,
+				stdioConfig.Command,
 				env,
-				server.Args...)
+				stdioConfig.Args...)
 		}
 		if err != nil {
 			for _, c := range clients {
@@ -310,15 +380,37 @@ func handleServersCommand(config *MCPConfig) {
 		} else {
 			for name, server := range config.MCPServers {
 				markdown.WriteString(fmt.Sprintf("# %s\n\n", name))
-				markdown.WriteString("*Command*\n")
-				markdown.WriteString(fmt.Sprintf("`%s`\n\n", server.Command))
 
-				markdown.WriteString("*Arguments*\n")
-				if len(server.Args) > 0 {
-					markdown.WriteString(fmt.Sprintf("`%s`\n", strings.Join(server.Args, " ")))
+				if server.Config.GetType() == transportSSE {
+					sseConfig := server.Config.(SSEServerConfig)
+					markdown.WriteString("*Url*\n")
+					markdown.WriteString(fmt.Sprintf("`%s`\n\n", sseConfig.Url))
+					markdown.WriteString("*headers*\n")
+					if sseConfig.Headers != nil {
+						for _, header := range sseConfig.Headers {
+							parts := strings.SplitN(header, ":", 2)
+							if len(parts) == 2 {
+								key := strings.TrimSpace(parts[0])
+								markdown.WriteString("`" + key + ": [REDACTED]`\n")
+							}
+						}
+					} else {
+						markdown.WriteString("*None*\n")
+					}
+
 				} else {
-					markdown.WriteString("*None*\n")
+					stdioConfig := server.Config.(STDIOServerConfig)
+					markdown.WriteString("*Command*\n")
+					markdown.WriteString(fmt.Sprintf("`%s`\n\n", stdioConfig.Command))
+
+					markdown.WriteString("*Arguments*\n")
+					if len(stdioConfig.Args) > 0 {
+						markdown.WriteString(fmt.Sprintf("`%s`\n", strings.Join(stdioConfig.Args, " ")))
+					} else {
+						markdown.WriteString("*None*\n")
+					}
 				}
+
 				markdown.WriteString("\n") // Add spacing between servers
 			}
 		}
