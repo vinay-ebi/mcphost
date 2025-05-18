@@ -1,6 +1,6 @@
 module github.com/mark3labs/mcphost
 
-go 1.23.0
+go 1.23
 
 require (
 	github.com/charmbracelet/huh v0.3.0
