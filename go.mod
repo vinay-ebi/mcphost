@@ -1,4 +1,4 @@
-module github.com/mark3labs/mcphost
+module github.com/vinay-ebi/mcphost
 
 go 1.23
 
