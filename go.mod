@@ -1,6 +1,6 @@
 module github.com/vinay-ebi/mcphost
 
-go 1.23
+go 1.22.8
 
 require (
 	github.com/charmbracelet/huh v0.3.0
